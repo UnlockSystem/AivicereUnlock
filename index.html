@@ -28,9 +28,17 @@
             text-align: center;
         }
         h2 {
-            margin-top: 0;
-            margin-bottom: 8px;
-            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .icona-titolo {
+            width: 28px;
+            height: 28px;
+            object-fit: contain;
+            border-radius: 6px; /* opzionale, se vuoi angoli arrotondati */
         }
         p.subtitle {
             color: #94a3b8;
@@ -103,7 +111,10 @@
 <body>
 
 <div class="card">
-    <h2>🔑 Aivicere</h2>
+    <h2>
+    <img src="aivicere-logo.png" alt="Aivicere" class="icona-titolo">
+    Aivicere
+    </h2>
     <p class="subtitle">Inserisci il codice a 6 cifre e premi Apri</p>
 
     <input type="text" id="codice" maxlength="6" inputmode="numeric" placeholder="000000" autocomplete="one-time-code">
