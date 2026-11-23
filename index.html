@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apertura Varco 1</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+        }
+        h2 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 22px;
+        }
+        p.subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 24px;
+        }
+        input {
+            width: 100%;
+            padding: 16px;
+            font-size: 26px;
+            font-family: monospace;
+            letter-spacing: 6px;
+            text-align: center;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            background: #0f172a;
+            color: #ffffff;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        .btn-apri {
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            background: #2563eb;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn-apri:hover {
+            background: #1d4ed8;
+        }
+        .btn-apri:active {
+            transform: scale(0.98);
+        }
+        .btn-apri:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .msg {
+            margin-top: 18px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+        }
+        .msg.ok {
+            display: block;
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid #10b981;
+        }
+        .msg.err {
+            display: block;
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid #ef4444;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🔑 Varco 1</h2>
+    <p class="subtitle">Inserisci il codice a 6 cifre e premi Apri</p>
+
+    <input type="text" id="codice" maxlength="6" inputmode="numeric" placeholder="000000" autocomplete="one-time-code">
+
+    <button id="btnApri" class="btn-apri" onclick="inviaApertura()">Apri</button>
+
+    <div id="feedback" class="msg"></div>
+</div>
+
+<script>
+    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
+    const topicComando = 'casa99-siracusa/s3-varco1-abc123/comando';
+
+    const client = mqtt.connect(mqttBroker, {
+        clientId: 'web_varco1_' + Math.random().toString(16).substring(2, 8)
+    });
+
+    client.on('connect', () => {
+        console.log('Connesso al broker MQTT per Varco 1');
+    });
+
+    function mostraFeedback(testo, tipo) {
+        const el = document.getElementById('feedback');
+        el.innerText = testo;
+        el.className = 'msg ' + tipo;
+    }
+
+    function inviaApertura() {
+        const inputEl = document.getElementById('codice');
+        const btnEl = document.getElementById('btnApri');
+        const codice = inputEl.value.trim();
+
+        if (!codice) {
+            mostraFeedback('Inserisci il codice di accesso.', 'err');
+            return;
+        }
+
+        if (!client.connected) {
+            mostraFeedback('Connessione MQTT in corso, riprova tra un attimo...', 'err');
+            return;
+        }
+
+        btnEl.disabled = true;
+
+        const payload = JSON.stringify({
+            codice: codice,
+            azione: "APRI"
+        });
+
+        client.publish(topicComando, payload, {}, (err) => {
+            setTimeout(() => { btnEl.disabled = false; }, 1200);
+
+            if (!err) {
+                mostraFeedback('✅ Comando APRI inviato al Varco 1!', 'ok');
+            } else {
+                mostraFeedback('❌ Errore durante l\'invio del comando.', 'err');
+            }
+        });
+    }
+</script>
+
+</body>
+</html>
