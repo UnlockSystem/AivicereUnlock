@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Varco 1</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: auto;
+        }
+        .card {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #0f172a;
+        }
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        .btn-secondary {
+            background-color: #475569;
+            width: auto;
+            padding: 8px 16px;
+            margin-top: 0;
+        }
+        .btn-secondary:hover {
+            background-color: #334155;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+        .success { background-color: #d1fae5; color: #065f46; }
+        .error { background-color: #fee2e2; color: #991b1b; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        th {
+            color: #64748b;
+            background-color: #f8fafc;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            width: auto;
+            padding: 6px 12px;
+            margin-top: 0;
+            font-size: 13px;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>🛠️ Nuova Prenotazione - Varco 1</h2>
+
+        <label for="admin_password">Password Admin:</label>
+        <input type="password" id="admin_password" value="1234" placeholder="Inserisci password admin">
+
+        <label for="email_utente">Email Ospite:</label>
+        <input type="email" id="email_utente" placeholder="ospite@example.com">
+
+        <label for="codice_generato">Codice Univoco (6 cifre):</label>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="codice_generato" readonly style="background: #f8fafc; font-family: monospace; font-weight: bold; font-size: 18px; letter-spacing: 2px;">
+            <button type="button" onclick="generaCodiceCasuale()" style="width: 140px; margin-top: 6px;">Genera</button>
+        </div>
+
+        <label for="data_inizio">Inizio Validità:</label>
+        <input type="datetime-local" id="data_inizio">
+
+        <label for="data_fine">Fine Validità (Scadenza):</label>
+        <input type="datetime-local" id="data_fine">
+
+        <button onclick="inviaPrenotazione()">Crea Codice e Invia Email</button>
+
+        <div id="status-msg" class="status"></div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0;">🔑 Codici Varco 1 Attivi</h3>
+            <button class="btn-secondary" onclick="richiediLista()">Aggiorna Elenco</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Codice</th>
+                    <th>Scadenza</th>
+                    <th>Azione</th>
+                </tr>
+            </thead>
+            <tbody id="tabella-prenotazioni">
+                <tr><td colspan="4" style="text-align: center; color: #94a3b8;">Clicca su "Aggiorna Elenco" per caricare le chiavi.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
+    const topicAdmin = 'casa99-siracusa/s3-varco1-abc123/admin';
+    const topicAdminStatus = 'casa99-siracusa/s3-varco1-abc123/admin/status';
+
+    const client = mqtt.connect(mqttBroker, {
+        clientId: 'admin_varco1_' + Math.random().toString(16).substring(2, 8)
+    });
+    let listaTemporanea = [];
+
+    client.on('connect', function () {
+        console.log('Connesso al broker MQTT (Admin Varco 1)');
+        client.subscribe(topicAdminStatus);
+        setTimeout(richiediLista, 1000);
+    });
+
+    client.on('message', function (topic, payload) {
+        if (topic === topicAdminStatus) {
+            try {
+                const data = JSON.parse(payload.toString());
+
+                if (data.tipo === "inizio") {
+                    listaTemporanea = [];
+                } else if (data.tipo === "item") {
+                    listaTemporanea.push({
+                        email: data.email,
+                        codice: data.codice,
+                        start: data.start,
+                        end: data.end
+                    });
+                } else if (data.tipo === "fine") {
+                    aggiornaTabella(listaTemporanea);
+                }
+            } catch (e) {
+                console.error("Errore parsing JSON status:", e);
+            }
+        }
+    });
+
+    function generaCodiceCasuale() {
+        const randomCode = Math.floor(100000 + Math.random() * 900000);
+        document.getElementById('codice_generato').value = randomCode;
+    }
+
+    window.onload = function() {
+        generaCodiceCasuale();
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+        document.getElementById('data_inizio').value = now.toISOString().slice(0, 16);
+        document.getElementById('data_fine').value = tomorrow.toISOString().slice(0, 16);
+    };
+
+    function mostraMessaggio(testo, tipo) {
+        const msgEl = document.getElementById('status-msg');
+        msgEl.innerText = testo;
+        msgEl.className = 'status ' + tipo;
+        msgEl.style.display = 'block';
+        setTimeout(() => { msgEl.style.display = 'none'; }, 4000);
+    }
+
+    function inviaPrenotazione() {
+        const adminSecret = document.getElementById('admin_password').value;
+        const email = document.getElementById('email_utente').value;
+        const codice = document.getElementById('codice_generato').value;
+        const startStrVal = document.getElementById('data_inizio').value;
+        const endStrVal = document.getElementById('data_fine').value;
+
+        if (!email || !codice || !startStrVal || !endStrVal) {
+            mostraMessaggio('Compila tutti i campi!', 'error');
+            return;
+        }
+
+        const startTs = Math.floor(new Date(startStrVal).getTime() / 1000);
+        const endTs = Math.floor(new Date(endStrVal).getTime() / 1000);
+
+        const payload = JSON.stringify({
+            admin_secret: adminSecret,
+            azione: "crea",
+            email: email,
+            codice: codice,
+            start_ts: startTs,
+            end_ts: endTs,
+            start_str: startStrVal.replace('T', ' '),
+            end_str: endStrVal.replace('T', ' ')
+        });
+
+        client.publish(topicAdmin, payload, {}, (err) => {
+            if (!err) {
+                mostraMessaggio('✅ Prenotazione inviata!', 'success');
+                setTimeout(richiediLista, 1500);
+            } else {
+                mostraMessaggio('❌ Errore nell\'invio del comando MQTT', 'error');
+            }
+        });
+    }
+
+    function richiediLista() {
+        const adminSecret = document.getElementById('admin_password').value;
+        const payload = JSON.stringify({
+            admin_secret: adminSecret,
+            azione: "get_list"
+        });
+        client.publish(topicAdmin, payload);
+    }
+
+    function revocaCodice(codiceDaEliminare) {
+        const adminSecret = document.getElementById('admin_password').value;
+        if (!confirm(`Vuoi revocare il codice ${codiceDaEliminare}?`)) return;
+
+        const payload = JSON.stringify({
+            admin_secret: adminSecret,
+            azione: "elimina",
+            codice: codiceDaEliminare
+        });
+        client.publish(topicAdmin, payload);
+        setTimeout(richiediLista, 800);
+    }
+
+    function aggiornaTabella(prenotazioni) {
+        const tbody = document.getElementById('tabella-prenotazioni');
+        tbody.innerHTML = '';
+
+        if (!prenotazioni || prenotazioni.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Nessuna prenotazione attiva.</td></tr>';
+            return;
+        }
+
+        prenotazioni.forEach(p => {
+            const dataScadenza = new Date(p.end * 1000).toLocaleString();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${p.email}</td>
+                <td style="font-weight: bold; font-family: monospace;">${p.codice}</td>
+                <td>${dataScadenza}</td>
+                <td><button class="btn-danger" onclick="revocaCodice('${p.codice}')">Revoca</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+
+</body>
+</html>
