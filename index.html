@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apertura Aivicere</title>
+    <title>Apertura Ai Vicerè</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body {
@@ -112,8 +112,7 @@
 
 <div class="card">
     <h2>
-    <img src="aivicere-logo.png" alt="Aivicere" class="icona-titolo">
-    Aivicere
+    <img src="aivicere-logo.png" alt="Ai Vicerè" class="icona-titolo">
     </h2>
     <p class="subtitle">Inserisci il codice a 6 cifre e premi Apri</p>
 
@@ -133,7 +132,7 @@
     });
 
     client.on('connect', () => {
-        console.log('Connesso al broker MQTT per Varco 1');
+        console.log('Connesso');
     });
 
     function mostraFeedback(testo, tipo) {
@@ -168,7 +167,7 @@
             setTimeout(() => { btnEl.disabled = false; }, 1200);
 
             if (!err) {
-                mostraFeedback('✅ Comando APRI inviato al Varco 1!', 'ok');
+                mostraFeedback('✅ Comando APRI inviato!', 'ok');
             } else {
                 mostraFeedback('❌ Errore durante l\'invio del comando.', 'err');
             }
