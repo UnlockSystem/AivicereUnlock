@@ -115,7 +115,7 @@
 
 <script>
     const mqttBroker = 'wss://broker.emqx.io:8084/mqtt';
-    const topicComando = 'casa99-siracusa/s3-varco1-abc123/comando';
+    const topicComando = 'casa99-siracusa/s3-varco1-singolo/comando';
 
     const client = mqtt.connect(mqttBroker, {
         clientId: 'web_varco1_' + Math.random().toString(16).substring(2, 8)
