@@ -74,8 +74,7 @@
         }
         .success { background-color: #d1fae5; color: #065f46; }
         .error { background-color: #fee2e2; color: #991b1b; }
-        
-        /* Stili barra di caricamento invio mail */
+
         .progress-wrapper {
             display: none;
             margin-top: 15px;
@@ -154,7 +153,6 @@
 
         <button onclick="inviaPrenotazione()">Crea Codice e Invia Email</button>
 
-        <!-- Barra di caricamento 20 secondi -->
         <div id="box-caricamento-mail" class="progress-wrapper">
             <div class="progress-track">
                 <div id="barra-progresso-mail" class="progress-bar"></div>
@@ -204,6 +202,11 @@
         setTimeout(richiediLista, 1000);
     });
 
+    client.on('error', function (err) {
+        console.error('Errore MQTT:', err);
+        mostraMessaggio('❌ Errore connessione al broker MQTT', 'error');
+    });
+
     client.on('message', function (topic, payload) {
         if (topic === topicAdminStatus) {
             try {
@@ -232,13 +235,18 @@
         document.getElementById('codice_generato').value = randomCode;
     }
 
+    function formatLocalDatetime(dateObj) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${dateObj.getFullYear()}-${pad(dateObj.getMonth() + 1)}-${pad(dateObj.getDate())}T${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}`;
+    }
+
     window.onload = function() {
         generaCodiceCasuale();
         const now = new Date();
         const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-        document.getElementById('data_inizio').value = now.toISOString().slice(0, 16);
-        document.getElementById('data_fine').value = tomorrow.toISOString().slice(0, 16);
+        document.getElementById('data_inizio').value = formatLocalDatetime(now);
+        document.getElementById('data_fine').value = formatLocalDatetime(tomorrow);
     };
 
     function mostraMessaggio(testo, tipo) {
@@ -256,7 +264,7 @@
 
         clearInterval(timerBarraMail);
 
-        const durataMs = 20000; // 20 secondi
+        const durataMs = 20000;
         const passoMs = 100;
         const incremento = 100 / (durataMs / passoMs);
         let progresso = 0;
@@ -284,9 +292,14 @@
     }
 
     function inviaPrenotazione() {
+        if (!client.connected) {
+            mostraMessaggio('❌ Non connesso al broker MQTT, attendi qualche secondo.', 'error');
+            return;
+        }
+
         const adminSecret = document.getElementById('admin_password').value;
-        const email = document.getElementById('email_utente').value;
-        const codice = document.getElementById('codice_generato').value;
+        const email = document.getElementById('email_utente').value.trim();
+        const codice = document.getElementById('codice_generato').value.trim();
         const startStrVal = document.getElementById('data_inizio').value;
         const endStrVal = document.getElementById('data_fine').value;
 
@@ -321,6 +334,7 @@
     }
 
     function richiediLista() {
+        if (!client.connected) return;
         const adminSecret = document.getElementById('admin_password').value;
         const payload = JSON.stringify({
             admin_secret: adminSecret,
@@ -330,6 +344,7 @@
     }
 
     function revocaCodice(codiceDaEliminare) {
+        if (!client.connected) return;
         const adminSecret = document.getElementById('admin_password').value;
         if (!confirm(`Vuoi revocare il codice ${codiceDaEliminare}?`)) return;
 
