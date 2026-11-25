@@ -74,6 +74,33 @@
         }
         .success { background-color: #d1fae5; color: #065f46; }
         .error { background-color: #fee2e2; color: #991b1b; }
+        
+        /* Stili barra di caricamento invio mail */
+        .progress-wrapper {
+            display: none;
+            margin-top: 15px;
+        }
+        .progress-track {
+            width: 100%;
+            height: 12px;
+            background-color: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #2563eb;
+            transition: width 0.2s linear, background-color 0.3s ease;
+        }
+        .progress-text {
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            color: #1e293b;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -127,6 +154,14 @@
 
         <button onclick="inviaPrenotazione()">Crea Codice e Invia Email</button>
 
+        <!-- Barra di caricamento 20 secondi -->
+        <div id="box-caricamento-mail" class="progress-wrapper">
+            <div class="progress-track">
+                <div id="barra-progresso-mail" class="progress-bar"></div>
+            </div>
+            <div id="stato-mail" class="progress-text"></div>
+        </div>
+
         <div id="status-msg" class="status"></div>
     </div>
 
@@ -161,6 +196,7 @@
         clientId: 'admin_varco1_' + Math.random().toString(16).substring(2, 8)
     });
     let listaTemporanea = [];
+    let timerBarraMail = null;
 
     client.on('connect', function () {
         console.log('Connesso al broker MQTT (Admin Varco 1)');
@@ -213,6 +249,40 @@
         setTimeout(() => { msgEl.style.display = 'none'; }, 4000);
     }
 
+    function avviaBarraInvioMail() {
+        const box = document.getElementById('box-caricamento-mail');
+        const barra = document.getElementById('barra-progresso-mail');
+        const stato = document.getElementById('stato-mail');
+
+        clearInterval(timerBarraMail);
+
+        const durataMs = 20000; // 20 secondi
+        const passoMs = 100;
+        const incremento = 100 / (durataMs / passoMs);
+        let progresso = 0;
+
+        box.style.display = 'block';
+        barra.style.width = '0%';
+        barra.style.backgroundColor = '#2563eb';
+        stato.style.color = '#1e293b';
+        stato.innerText = 'Invio email in corso...';
+
+        timerBarraMail = setInterval(() => {
+            progresso += incremento;
+
+            if (progresso >= 100) {
+                progresso = 100;
+                barra.style.width = '100%';
+                barra.style.backgroundColor = '#10b981';
+                clearInterval(timerBarraMail);
+                stato.style.color = '#065f46';
+                stato.innerText = 'email inoltrata';
+            } else {
+                barra.style.width = progresso.toFixed(1) + '%';
+            }
+        }, passoMs);
+    }
+
     function inviaPrenotazione() {
         const adminSecret = document.getElementById('admin_password').value;
         const email = document.getElementById('email_utente').value;
@@ -242,6 +312,7 @@
         client.publish(topicAdmin, payload, {}, (err) => {
             if (!err) {
                 mostraMessaggio('✅ Prenotazione inviata!', 'success');
+                avviaBarraInvioMail();
                 setTimeout(richiediLista, 1500);
             } else {
                 mostraMessaggio('❌ Errore nell\'invio del comando MQTT', 'error');
